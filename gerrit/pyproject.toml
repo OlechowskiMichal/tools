@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gerrit-review-parser"
+version = "0.1.0"
+description = "Parse Gerrit review JSON and display comments with file context"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+    { name = "Michal Olechowski" }
+]
+dependencies = [
+    "click>=8.0.0",
+]
+
+[project.scripts]
+gerrit-review-parser = "gerrit_review_parser.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gerrit_review_parser"]
