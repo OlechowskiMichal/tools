@@ -12,7 +12,7 @@ from .gerrit import build_ssh_command, fetch_from_gerrit, load_gerrit_config
 from .parser import display_review, extract_comments, output_as_dict, parse_json_content
 
 
-def _die(msg: str) -> NoReturn:
+def _fatal_exit(msg: str) -> NoReturn:
     """Print fatal error and exit."""
     print(f"FATAL: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -51,7 +51,7 @@ def _load_from_file(filepath: str, debug: bool) -> str:
         with open(filepath) as f:
             return f.read()
     except Exception as e:
-        _die(f"Cannot read {filepath}: {e}")
+        _fatal_exit(f"Cannot read {filepath}: {e}")
 
 
 def _fetch_and_save(
@@ -142,7 +142,7 @@ def main(
     json_content = _load_json_content(review_file, changeid, query, save, output, debug_mode)
 
     if not json_content:
-        _die("No input provided")
+        _fatal_exit("No input provided")
 
     data = parse_json_content(json_content)
     comments = extract_comments(data, unresolved_only, debug_mode)
