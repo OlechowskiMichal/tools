@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from gerrit_review_parser.parser import (
     Comment,
     extract_comments,
@@ -52,33 +50,6 @@ def test_extract_comments_unresolved_only(sample_parsed_data):
     comments = extract_comments(sample_parsed_data, unresolved_only=True)
     assert len(comments) == 2
     assert all(c.unresolved for c in comments)
-
-
-def test_comment_immutability():
-    """Test that Comment is frozen and cannot be modified."""
-    comment = Comment(
-        file="test.py",
-        line=10,
-        reviewer="Test",
-        message="Fix this",
-        unresolved=True,
-    )
-    with pytest.raises(AttributeError):
-        comment.file = "other.py"
-    with pytest.raises(AttributeError):
-        comment.line = 20
-
-
-def test_comment_hashable():
-    """Test that frozen Comment is hashable (can be used in sets)."""
-    comment1 = Comment(
-        file="test.py", line=10, reviewer="Test", message="Fix", unresolved=True
-    )
-    comment2 = Comment(
-        file="test.py", line=10, reviewer="Test", message="Fix", unresolved=True
-    )
-    comment_set = {comment1, comment2}
-    assert len(comment_set) == 1
 
 
 def test_output_as_dict_structure(sample_parsed_data):

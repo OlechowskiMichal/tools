@@ -17,15 +17,6 @@ def test_version_flag():
     assert "0.1.0" in result.output
 
 
-def test_version_flag_long():
-    """Test that long form --version also works."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["--version"])
-    assert result.exit_code == 0
-    assert "gerrit-review-parser" in result.output
-    assert "0.1.0" in result.output
-
-
 def test_help_flag():
     """Test that --help shows usage information."""
     runner = CliRunner()
@@ -35,6 +26,8 @@ def test_help_flag():
     assert "--file" in result.output
     assert "--changeid" in result.output
     assert "--version" in result.output
+    assert "--json" in result.output
+    assert "--dry-run" in result.output
 
 
 SAMPLE_JSON = """{
@@ -99,13 +92,6 @@ def test_json_flag_comment_structure():
         temp_file.unlink()
 
 
-def test_json_help_shows_json_option():
-    """Test that --help shows --json option."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["--help"])
-    assert "--json" in result.output
-
-
 def test_dry_run_shows_command():
     """Test that --dry-run shows the SSH command that would be executed."""
     runner = CliRunner()
@@ -160,10 +146,3 @@ def test_dry_run_with_json():
     assert parsed["dry_run"] is True
     assert "command" in parsed
     assert "ssh" in parsed["command"]
-
-
-def test_dry_run_help_shows_option():
-    """Test that --help shows --dry-run option."""
-    runner = CliRunner()
-    result = runner.invoke(main, ["--help"])
-    assert "--dry-run" in result.output

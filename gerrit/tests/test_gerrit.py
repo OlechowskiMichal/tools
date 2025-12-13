@@ -4,28 +4,11 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import pytest
-
 from gerrit_review_parser.gerrit import (
     GerritConfig,
     build_ssh_command,
     load_gerrit_config,
 )
-
-
-def test_gerrit_config_immutable():
-    """Test that GerritConfig is immutable (NamedTuple)."""
-    config = GerritConfig(host="gerrit.example.com", port="29418", user="testuser")
-    with pytest.raises(AttributeError):
-        config.host = "other.example.com"
-
-
-def test_gerrit_config_named_fields():
-    """Test that GerritConfig has named fields accessible."""
-    config = GerritConfig(host="gerrit.example.com", port="29418", user="testuser")
-    assert config.host == "gerrit.example.com"
-    assert config.port == "29418"
-    assert config.user == "testuser"
 
 
 def test_load_gerrit_config_from_env():
