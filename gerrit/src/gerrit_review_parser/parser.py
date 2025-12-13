@@ -4,11 +4,13 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from itertools import groupby
 
 
-@dataclass
+@dataclass(frozen=True)
 class Comment:
-    """A single review comment."""
+    """A single review comment (immutable)."""
+
     file: str
     line: int
     reviewer: str
@@ -59,8 +61,32 @@ def parse_json_content(json_content: str) -> dict:
         sys.exit(1)
 
 
-def extract_comments(data: dict, unresolved_only: bool = False, debug: bool = False) -> list[Comment]:
+def _extract_comment(comment_data: dict) -> Comment | None:
+    """Extract a Comment from raw comment data.
+
+    Args:
+        comment_data: Raw comment dict from Gerrit JSON
+
+    Returns:
+        Comment if valid, None otherwise
+    """
+    if "file" not in comment_data or "line" not in comment_data:
+        return None
+    return Comment(
+        file=comment_data["file"],
+        line=comment_data["line"],
+        reviewer=comment_data["reviewer"]["name"],
+        message=comment_data["message"],
+        unresolved=comment_data.get("unresolved", True),
+    )
+
+
+def extract_comments(
+    data: dict, unresolved_only: bool = False, debug: bool = False
+) -> list[Comment]:
     """Extract file comments from parsed Gerrit data.
+
+    Pure function using comprehensions and sorted() instead of mutable patterns.
 
     Args:
         data: Parsed Gerrit JSON
@@ -70,33 +96,25 @@ def extract_comments(data: dict, unresolved_only: bool = False, debug: bool = Fa
     Returns:
         List of Comment objects sorted by file and line
     """
-    comments = []
+    if debug:
+        for ps in data.get("patchSets", []):
+            print(f"[DEBUG] Checking patch set {ps.get('number', 0)}", file=sys.stderr)
 
-    for patch_set in data.get('patchSets', []):
-        patch_num = patch_set.get('number', 0)
-        if debug:
-            print(f"[DEBUG] Checking patch set {patch_num}", file=sys.stderr)
+    raw_comments = [
+        comment
+        for patch_set in data.get("patchSets", [])
+        for comment in patch_set.get("comments", [])
+    ]
 
-        for comment in patch_set.get('comments', []):
-            if 'file' in comment and 'line' in comment:
-                is_unresolved = comment.get('unresolved', True)
+    comments = [c for c in (_extract_comment(r) for r in raw_comments) if c is not None]
 
-                if unresolved_only and not is_unresolved:
-                    continue
-
-                comments.append(Comment(
-                    file=comment['file'],
-                    line=comment['line'],
-                    reviewer=comment['reviewer']['name'],
-                    message=comment['message'],
-                    unresolved=is_unresolved
-                ))
+    if unresolved_only:
+        comments = [c for c in comments if c.unresolved]
 
     if debug:
         print(f"[DEBUG] Found {len(comments)} file comments", file=sys.stderr)
 
-    comments.sort(key=lambda x: (x.file, x.line))
-    return comments
+    return sorted(comments, key=lambda x: (x.file, x.line))
 
 
 def show_code_context(filepath: str, line_num: int, debug: bool = False, context: int = 2) -> None:
@@ -132,8 +150,44 @@ def show_code_context(filepath: str, line_num: int, debug: bool = False, context
         error(f"Cannot read {filepath}: {e}")
 
 
-def display_review(data: dict, comments: list[Comment], unresolved_only: bool = False, debug: bool = False) -> None:
+def output_as_dict(data: dict, comments: list[Comment]) -> dict:
+    """Convert review data to dictionary for JSON output.
+
+    Pure function returning review metadata and comments as a dict.
+
+    Args:
+        data: Parsed Gerrit JSON
+        comments: List of extracted comments
+
+    Returns:
+        Dictionary with project, change_number, subject, and comments
+    """
+    return {
+        "project": data.get("project", "Unknown"),
+        "change_number": data.get("number", "Unknown"),
+        "subject": data.get("subject", "No subject"),
+        "comments": [
+            {
+                "file": c.file,
+                "line": c.line,
+                "reviewer": c.reviewer,
+                "message": c.message,
+                "unresolved": c.unresolved,
+            }
+            for c in comments
+        ],
+    }
+
+
+def display_review(
+    data: dict,
+    comments: list[Comment],
+    unresolved_only: bool = False,
+    debug: bool = False,
+) -> None:
     """Display formatted review output.
+
+    Uses itertools.groupby for file grouping instead of mutable current_file.
 
     Args:
         data: Parsed Gerrit JSON
@@ -141,9 +195,9 @@ def display_review(data: dict, comments: list[Comment], unresolved_only: bool = 
         unresolved_only: Whether filtering is active
         debug: Enable debug output
     """
-    project = data.get('project', 'Unknown')
-    change_number = data.get('number', 'Unknown')
-    subject = data.get('subject', 'No subject')
+    project = data.get("project", "Unknown")
+    change_number = data.get("number", "Unknown")
+    subject = data.get("subject", "No subject")
 
     if debug:
         print(f"[DEBUG] Project: {project}, Change: {change_number}", file=sys.stderr)
@@ -162,16 +216,14 @@ def display_review(data: dict, comments: list[Comment], unresolved_only: bool = 
         print(f"Comments: {len(comments)}")
     print(f"{'='*70}")
 
-    current_file = None
-    for comment in comments:
-        if comment.file != current_file:
-            current_file = comment.file
-            print(f"\n{current_file}")
-            print("-" * 40)
+    for file_path, file_comments in groupby(comments, key=lambda c: c.file):
+        print(f"\n{file_path}")
+        print("-" * 40)
 
-        status = " [UNRESOLVED]" if comment.unresolved else ""
-        print(f"\nL{comment.line:4d} | {comment.reviewer}{status}")
-        print(f"     | {comment.message}")
+        for comment in file_comments:
+            status = " [UNRESOLVED]" if comment.unresolved else ""
+            print(f"\nL{comment.line:4d} | {comment.reviewer}{status}")
+            print(f"     | {comment.message}")
 
-        if not comment.file.startswith('/'):
-            show_code_context(comment.file, comment.line, debug)
+            if not comment.file.startswith("/"):
+                show_code_context(comment.file, comment.line, debug)
