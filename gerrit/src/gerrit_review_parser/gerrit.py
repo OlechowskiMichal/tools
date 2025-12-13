@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, NoReturn
 
 
 class GerritConfig(NamedTuple):
@@ -15,7 +15,7 @@ class GerritConfig(NamedTuple):
     user: str
 
 
-def die(msg: str) -> None:
+def die(msg: str) -> NoReturn:
     """Print fatal error and exit."""
     print(f"FATAL: {msg}", file=sys.stderr)
     sys.exit(1)
