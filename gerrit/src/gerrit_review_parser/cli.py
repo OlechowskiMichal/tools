@@ -4,13 +4,18 @@ import json
 import logging
 import sys
 from datetime import datetime
-from typing import NoReturn
 
 import click
 
 from . import __version__
-from .gerrit import build_ssh_command, fetch_from_gerrit, load_gerrit_config
-from .parser import display_review, extract_comments, output_as_dict, parse_json_content
+from .commands import build_query_command
+from .config import load_gerrit_config
+from .display import display_review
+from .errors import fatal_exit
+from .gerrit import fetch_from_gerrit
+from .io import read_file, write_file
+from .models import ReviewOutput
+from .parser import extract_comments, parse_json_content
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +55,11 @@ def main(
     json_content = _load_json_content(review_file, changeid, query, save, output)
 
     if not json_content:
-        _fatal_exit("No input provided")
+        fatal_exit("No input provided")
 
     data = parse_json_content(json_content)
-    comments = extract_comments(data, unresolved_only, debug_mode)
-    _output_result(data, comments, json_output, unresolved_only, debug_mode)
+    comments = extract_comments(data, unresolved_only)
+    _output_result(data, comments, json_output, unresolved_only)
 
 
 # --- Private helpers ---
@@ -70,12 +75,6 @@ def _setup_logging(debug: bool) -> None:
     )
 
 
-def _fatal_exit(msg: str) -> NoReturn:
-    """Log fatal error and exit."""
-    logger.fatal(msg)
-    sys.exit(1)
-
-
 def _normalize_changeid(changeid: str) -> str:
     """Ensure changeid has 'change:' prefix."""
     if not changeid.startswith("change:"):
@@ -87,40 +86,40 @@ def _handle_dry_run(changeid: str | None, query: str | None, json_output: bool) 
     """Handle dry-run mode: show command without executing."""
     query_str = _normalize_changeid(changeid) if changeid else query
     config = load_gerrit_config()
-    cmd = build_ssh_command(config, query_str)
+    cmd = build_query_command(config, query_str)
     cmd_str = " ".join(cmd)
 
     if json_output:
-        print(json.dumps({"dry_run": True, "command": cmd_str}, indent=2))
+        click.echo(json.dumps({"dry_run": True, "command": cmd_str}, indent=2))
     else:
-        print(f"[DRY-RUN] Would execute: {cmd_str}")
+        click.echo(f"[DRY-RUN] Would execute: {cmd_str}")
 
 
 def _load_from_file(filepath: str) -> str:
     """Load JSON content from file."""
     logger.debug(f"Loading review from file: {filepath}")
     try:
-        with open(filepath) as f:
-            return f.read()
+        return read_file(filepath)
     except Exception as e:
-        _fatal_exit(f"Cannot read {filepath}: {e}")
+        fatal_exit(f"Cannot read {filepath}: {e}")
 
 
 def _fetch_and_save(query_str: str, save: bool, output: str | None, filename_prefix: str) -> str:
     """Fetch from Gerrit and optionally save to file."""
     json_content = fetch_from_gerrit(query_str)
 
-    if save:
-        if filename_prefix.startswith("change:"):
-            default_name = f"review-{filename_prefix.replace('change:', '')}.json"
-        else:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            default_name = f"query-{timestamp}.json"
+    if not save:
+        return json_content
 
-        filename = output or default_name
-        with open(filename, "w") as f:
-            f.write(json_content)
-        logger.info(f"Saved JSON to: {filename}")
+    default_name = (
+        f"review-{filename_prefix.removeprefix('change:')}.json"
+        if filename_prefix.startswith("change:")
+        else f"query-{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+
+    filename = output or default_name
+    write_file(filename, json_content)
+    logger.info(f"Saved JSON to: {filename}")
 
     return json_content
 
@@ -150,14 +149,14 @@ def _load_json_content(
 
 
 def _output_result(
-    data: dict, comments: list, json_output: bool, unresolved_only: bool, debug: bool
+    data: dict, comments: list, json_output: bool, unresolved_only: bool
 ) -> None:
     """Output results as JSON or human-readable format."""
     if json_output:
-        result = output_as_dict(data, comments)
-        print(json.dumps(result, indent=2))
+        result = ReviewOutput.from_gerrit_data(data, comments).to_dict()
+        click.echo(json.dumps(result, indent=2))
     else:
-        display_review(data, comments, unresolved_only, debug)
+        display_review(data, comments, unresolved_only)
 
 
 if __name__ == "__main__":

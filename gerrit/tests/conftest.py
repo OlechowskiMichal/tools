@@ -1,6 +1,17 @@
 """Pytest configuration and fixtures for gerrit-review-parser tests."""
 
+import json
+import tempfile
+from pathlib import Path
+
 import pytest
+from click.testing import CliRunner
+
+
+@pytest.fixture
+def cli_runner():
+    """Return Click test runner."""
+    return CliRunner()
 
 
 @pytest.fixture
@@ -49,12 +60,31 @@ def sample_gerrit_json():
 @pytest.fixture
 def sample_parsed_data(sample_gerrit_json):
     """Return parsed sample data."""
-    import json
     return json.loads(sample_gerrit_json)
+
+
+@pytest.fixture
+def sample_json_file(sample_gerrit_json):
+    """Create temp file with sample JSON, clean up after test."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f.write(sample_gerrit_json)
+        temp_path = Path(f.name)
+    yield temp_path
+    temp_path.unlink()
+
+
+@pytest.fixture
+def gerrit_env():
+    """Return test Gerrit environment variables."""
+    return {
+        "GERRIT_HOST": "gerrit.example.com",
+        "GERRIT_USER": "testuser",
+        "GERRIT_PORT": "29418",
+    }
 
 
 @pytest.fixture
 def gerrit_config():
     """Return test GerritConfig."""
-    from gerrit_review_parser.gerrit import GerritConfig
+    from gerrit_review_parser.models import GerritConfig
     return GerritConfig(host="gerrit.example.com", port="29418", user="testuser")
