@@ -1,10 +1,13 @@
 """Gerrit SSH/API layer for fetching review data."""
 
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple, NoReturn
+
+logger = logging.getLogger(__name__)
 
 
 class GerritConfig(NamedTuple):
@@ -13,30 +16,6 @@ class GerritConfig(NamedTuple):
     host: str
     port: str
     user: str
-
-
-def die(msg: str) -> NoReturn:
-    """Print fatal error and exit."""
-    print(f"FATAL: {msg}", file=sys.stderr)
-    sys.exit(1)
-
-
-def _parse_env_file(filepath: Path) -> dict[str, str]:
-    """Parse environment file without mutating os.environ.
-
-    Args:
-        filepath: Path to the env file
-
-    Returns:
-        Dictionary of parsed key-value pairs
-    """
-    result = {}
-    with open(filepath) as f:
-        for line in f:
-            if line.startswith("export "):
-                key, value = line[7:].strip().split("=", 1)
-                result[key] = value.strip('"')
-    return result
 
 
 def load_gerrit_config(
@@ -64,17 +43,17 @@ def load_gerrit_config(
     if not gerrit_host or not gerrit_user:
         file_path = env_file or Path.home() / ".env.gerrit"
         if not file_path.exists():
-            die("Gerrit not configured. Run: utils setup gerrit")
+            _fatal_exit("Gerrit not configured. Run: utils setup gerrit")
         try:
             file_env = _parse_env_file(file_path)
             gerrit_host = gerrit_host or file_env.get("GERRIT_HOST")
             gerrit_user = gerrit_user or file_env.get("GERRIT_USER")
             gerrit_port = file_env.get("GERRIT_PORT", gerrit_port)
         except Exception as e:
-            die(f"Failed to load Gerrit config: {e}")
+            _fatal_exit(f"Failed to load Gerrit config: {e}")
 
     if not gerrit_host or not gerrit_user:
-        die("Gerrit configuration incomplete")
+        _fatal_exit("Gerrit configuration incomplete")
 
     return GerritConfig(host=gerrit_host, port=gerrit_port, user=gerrit_user)
 
@@ -122,13 +101,39 @@ def fetch_from_gerrit(
 
     cmd = build_ssh_command(config, query_str)
 
-    if debug:
-        print(f"[DEBUG] Running: {' '.join(cmd)}", file=sys.stderr)
+    logger.debug(f"Running: {' '.join(cmd)}")
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
-        die(f"Gerrit query failed: {e.stderr}")
+        _fatal_exit(f"Gerrit query failed: {e.stderr}")
     except Exception as e:
-        die(f"Failed to run Gerrit query: {e}")
+        _fatal_exit(f"Failed to run Gerrit query: {e}")
+
+
+# --- Private helpers ---
+
+
+def _fatal_exit(msg: str) -> NoReturn:
+    """Log fatal error and exit."""
+    logger.fatal(msg)
+    sys.exit(1)
+
+
+def _parse_env_file(filepath: Path) -> dict[str, str]:
+    """Parse environment file without mutating os.environ.
+
+    Args:
+        filepath: Path to the env file
+
+    Returns:
+        Dictionary of parsed key-value pairs
+    """
+    result = {}
+    with open(filepath) as f:
+        for line in f:
+            if line.startswith("export "):
+                key, value = line[7:].strip().split("=", 1)
+                result[key] = value.strip('"')
+    return result

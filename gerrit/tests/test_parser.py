@@ -2,8 +2,8 @@
 
 import json
 
+from gerrit_review_parser.models import Comment
 from gerrit_review_parser.parser import (
-    Comment,
     extract_comments,
     output_as_dict,
     parse_json_content,

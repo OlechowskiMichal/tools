@@ -1,6 +1,7 @@
 """CLI entry point for gerrit-review-parser."""
 
 import json
+import logging
 import sys
 from datetime import datetime
 from typing import NoReturn
@@ -10,6 +11,8 @@ import click
 from . import __version__
 from .gerrit import build_ssh_command, fetch_from_gerrit, load_gerrit_config
 from .parser import display_review, extract_comments, output_as_dict, parse_json_content
+
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -38,11 +41,13 @@ def main(
         gerrit-review-parser --query "status:open project:myproject" --save
         gerrit-review-parser --changeid 12345 --dry-run
     """
+    _setup_logging(debug_mode)
+
     if dry_run and (changeid or query):
         _handle_dry_run(changeid, query, json_output)
         return
 
-    json_content = _load_json_content(review_file, changeid, query, save, output, debug_mode)
+    json_content = _load_json_content(review_file, changeid, query, save, output)
 
     if not json_content:
         _fatal_exit("No input provided")
@@ -55,16 +60,20 @@ def main(
 # --- Private helpers ---
 
 
+def _setup_logging(debug: bool) -> None:
+    """Configure logging based on debug flag."""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="[%(levelname)s] %(message)s",
+        stream=sys.stderr,
+    )
+
+
 def _fatal_exit(msg: str) -> NoReturn:
-    """Print fatal error and exit."""
-    print(f"FATAL: {msg}", file=sys.stderr)
+    """Log fatal error and exit."""
+    logger.fatal(msg)
     sys.exit(1)
-
-
-def _debug(msg: str, enabled: bool) -> None:
-    """Print debug message if enabled."""
-    if enabled:
-        print(f"[DEBUG] {msg}", file=sys.stderr)
 
 
 def _normalize_changeid(changeid: str) -> str:
@@ -87,9 +96,9 @@ def _handle_dry_run(changeid: str | None, query: str | None, json_output: bool) 
         print(f"[DRY-RUN] Would execute: {cmd_str}")
 
 
-def _load_from_file(filepath: str, debug: bool) -> str:
+def _load_from_file(filepath: str) -> str:
     """Load JSON content from file."""
-    _debug(f"Loading review from file: {filepath}", debug)
+    logger.debug(f"Loading review from file: {filepath}")
     try:
         with open(filepath) as f:
             return f.read()
@@ -97,11 +106,9 @@ def _load_from_file(filepath: str, debug: bool) -> str:
         _fatal_exit(f"Cannot read {filepath}: {e}")
 
 
-def _fetch_and_save(
-    query_str: str, save: bool, output: str | None, filename_prefix: str, debug: bool
-) -> str:
+def _fetch_and_save(query_str: str, save: bool, output: str | None, filename_prefix: str) -> str:
     """Fetch from Gerrit and optionally save to file."""
-    json_content = fetch_from_gerrit(query_str, debug)
+    json_content = fetch_from_gerrit(query_str)
 
     if save:
         if filename_prefix.startswith("change:"):
@@ -113,7 +120,7 @@ def _fetch_and_save(
         filename = output or default_name
         with open(filename, "w") as f:
             f.write(json_content)
-        print(f"Saved JSON to: {filename}")
+        logger.info(f"Saved JSON to: {filename}")
 
     return json_content
 
@@ -124,22 +131,21 @@ def _load_json_content(
     query: str | None,
     save: bool,
     output: str | None,
-    debug: bool,
 ) -> str:
     """Load JSON content from file, Gerrit, or stdin."""
     if review_file:
-        return _load_from_file(review_file, debug)
+        return _load_from_file(review_file)
 
     if changeid:
-        _debug(f"Fetching change ID: {changeid}", debug)
+        logger.debug(f"Fetching change ID: {changeid}")
         query_str = _normalize_changeid(changeid)
-        return _fetch_and_save(query_str, save, output, query_str, debug)
+        return _fetch_and_save(query_str, save, output, query_str)
 
     if query:
-        _debug(f"Fetching query: {query}", debug)
-        return _fetch_and_save(query, save, output, "query", debug)
+        logger.debug(f"Fetching query: {query}")
+        return _fetch_and_save(query, save, output, "query")
 
-    _debug("Reading from stdin", debug)
+    logger.debug("Reading from stdin")
     return sys.stdin.read()
 
 
