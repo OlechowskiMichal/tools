@@ -48,8 +48,17 @@ def display_review(
             click.echo(f"\nL{comment.line:4d} | {comment.reviewer}{status}")
             click.echo(f"     | {comment.message}")
 
-            if not comment.file.startswith("/"):
+            if _is_safe_path(comment.file):
                 show_code_context(comment.file, comment.line)
+
+
+def _is_safe_path(filepath: str) -> bool:
+    """Check if path is safe (no traversal, no absolute paths)."""
+    if filepath.startswith("/"):
+        return False
+    if ".." in filepath:
+        return False
+    return True
 
 
 def show_code_context(filepath: str, line_num: int, context: int = 2) -> None:

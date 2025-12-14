@@ -147,6 +147,8 @@ def _load_json_content(
         logger.debug(f"Fetching query: {query}")
         return _fetch_and_save(query, save, output, "query")
 
+    if sys.stdin.isatty():
+        return ""
     logger.debug("Reading from stdin")
     return sys.stdin.read()
 
