@@ -38,7 +38,8 @@ def display_review(
         click.echo(f"Comments: {len(comments)}")
     click.echo(f"{'='*70}")
 
-    for file_path, file_comments in groupby(comments, key=lambda c: c.file):
+    sorted_comments = sorted(comments, key=lambda c: (c.file, c.line))
+    for file_path, file_comments in groupby(sorted_comments, key=lambda c: c.file):
         click.echo(f"\n{file_path}")
         click.echo("-" * 40)
 

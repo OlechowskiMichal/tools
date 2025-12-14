@@ -19,7 +19,7 @@ def read_file(filepath: str | Path) -> str:
         FileNotFoundError: If file doesn't exist
         IOError: If file cannot be read
     """
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8") as f:
         return f.read()
 
 
@@ -36,7 +36,7 @@ def read_lines(filepath: str | Path) -> list[str]:
         FileNotFoundError: If file doesn't exist
         IOError: If file cannot be read
     """
-    with open(filepath) as f:
+    with open(filepath, encoding="utf-8") as f:
         return f.readlines()
 
 
@@ -47,6 +47,6 @@ def write_file(filepath: str | Path, content: str) -> None:
         filepath: Path to file
         content: Content to write
     """
-    with open(filepath, "w") as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         f.write(content)
-    logger.debug(f"Wrote {len(content)} bytes to {filepath}")
+    logger.debug(f"Wrote {len(content)} characters to {filepath}")

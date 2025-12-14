@@ -14,7 +14,7 @@ from .display import display_review
 from .errors import fatal_exit
 from .gerrit import fetch_from_gerrit
 from .io import read_file, write_file
-from .models import ReviewOutput
+from .models import Comment, ReviewOutput
 from .parser import extract_comments, parse_json_content
 
 logger = logging.getLogger(__name__)
@@ -47,6 +47,9 @@ def main(
         gerrit-review-parser --changeid 12345 --dry-run
     """
     _setup_logging(debug_mode)
+
+    if dry_run and review_file:
+        logger.warning("--dry-run has no effect when reading from file")
 
     if dry_run and (changeid or query):
         _handle_dry_run(changeid, query, json_output)
@@ -149,7 +152,7 @@ def _load_json_content(
 
 
 def _output_result(
-    data: dict, comments: list, json_output: bool, unresolved_only: bool
+    data: dict, comments: list[Comment], json_output: bool, unresolved_only: bool
 ) -> None:
     """Output results as JSON or human-readable format."""
     if json_output:
