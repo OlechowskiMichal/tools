@@ -27,6 +27,9 @@ Or set environment variables directly.
 ## Usage
 
 ```bash
+# Check version
+gerrit-review-parser --version
+
 # Fetch and parse a change by ID
 gerrit-review-parser --changeid 12345
 
@@ -42,6 +45,12 @@ gerrit-review-parser --changeid 12345 --save
 # Custom query
 gerrit-review-parser --query "status:open project:myproject"
 
+# Output as JSON (for CI/CD pipelines)
+gerrit-review-parser --file review.json --json
+
+# Preview SSH command without executing
+gerrit-review-parser --changeid 12345 --dry-run
+
 # Read from stdin
 cat review.json | gerrit-review-parser
 ```
@@ -50,12 +59,15 @@ cat review.json | gerrit-review-parser
 
 | Option | Short | Description |
 |--------|-------|-------------|
+| `--version` | | Show version and exit |
 | `--file` | `-f` | Path to Gerrit review JSON file |
 | `--changeid` | `-c` | Gerrit change ID to fetch |
 | `--query` | `-q` | Gerrit query string |
 | `--save` | `-s` | Save fetched JSON to file |
 | `--output` | `-o` | Custom output filename |
 | `--unresolved-only` | `-u` | Show only unresolved comments |
+| `--json` | | Output as JSON for machine processing |
+| `--dry-run` | | Show SSH command without executing |
 | `--debug` | | Enable debug output |
 
 ## Output

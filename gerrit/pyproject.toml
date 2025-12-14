@@ -16,8 +16,23 @@ dependencies = [
     "click>=8.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.8.0",
+]
+
 [project.scripts]
 gerrit-review-parser = "gerrit_review_parser.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gerrit_review_parser"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
