@@ -171,3 +171,4 @@ def test_env_takes_precedence_over_file(monkeypatch, tmp_path):
 
     assert config.host == "env.gerrit.com"
     assert config.user == "envuser"
+    assert config.port == "29418"  # DEFAULT_PORT, not file port
