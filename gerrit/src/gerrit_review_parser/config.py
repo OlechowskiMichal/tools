@@ -2,17 +2,20 @@
 
 import os
 import sys
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import tomli_w
 
 
 class ConfigError(Exception):
     """Raised when configuration is missing or invalid."""
-    pass
 
 
 @dataclass(frozen=True)
@@ -61,7 +64,7 @@ def load_config_file() -> Optional[GerritConfig]:
             port=str(data["port"]),
             user=data["user"]
         )
-    except Exception:
+    except (OSError, tomllib.TOMLDecodeError, KeyError, TypeError):
         return None
 
 

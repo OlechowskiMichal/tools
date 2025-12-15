@@ -19,7 +19,6 @@ from .parser import parse_json_content, extract_comments, display_review
 @click.group()
 def cli():
     """Parse Gerrit review JSON and display comments with file context."""
-    pass
 
 
 @cli.command()
@@ -35,9 +34,9 @@ def parse(review_file, changeid, query, save, output, debug_mode, unresolved_onl
     """Parse Gerrit review JSON and display comments with file context.
 
     Examples:
-        gerrit-review-parser --changeid 12345
-        gerrit-review-parser --file review.json --unresolved-only
-        gerrit-review-parser --query "status:open project:myproject" --save
+        gerrit-review-parser parse --changeid 12345
+        gerrit-review-parser parse --file review.json --unresolved-only
+        gerrit-review-parser parse --query "status:open project:myproject" --save
     """
     json_content = None
 
@@ -134,7 +133,7 @@ def setup():
         click.echo()
         click.echo("Configuration saved successfully!")
         click.echo(f"Config file: {config_path}")
-    except Exception as e:
+    except OSError as e:
         click.echo(f"Error saving configuration: {e}", err=True)
         sys.exit(1)
 
@@ -142,7 +141,6 @@ def setup():
 @cli.group()
 def config():
     """Manage configuration settings."""
-    pass
 
 
 @config.command()
