@@ -40,6 +40,16 @@ gerrit-review-parser config show
 
 This displays the effective configuration and indicates the source of each value (env, file, or default).
 
+### Upgrading from Previous Versions
+
+If you previously used `.env.gerrit`, the configuration has moved to `~/.config/gerrit-review-parser/config.toml`. Run the interactive setup to migrate:
+
+```bash
+gerrit-review-parser setup
+```
+
+Your old `.env.gerrit` will no longer be read; environment variables (`GERRIT_HOST`, `GERRIT_PORT`, `GERRIT_USER`) continue to take precedence if set.
+
 ## Usage
 
 ```bash
