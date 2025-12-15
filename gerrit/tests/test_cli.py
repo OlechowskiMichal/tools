@@ -2,31 +2,39 @@
 
 import json
 
-from gerrit_review_parser.cli import main
+from gerrit_review_parser.cli import cli
 
 
 def test_version_flag(cli_runner):
     """Test that --version outputs version string."""
-    result = cli_runner.invoke(main, ["--version"])
+    result = cli_runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output
+    assert "0.2.0" in result.output
 
 
 def test_help_flag(cli_runner):
     """Test that --help shows usage information."""
-    result = cli_runner.invoke(main, ["--help"])
+    result = cli_runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "Parse Gerrit review JSON" in result.output
+    assert "parse" in result.output
+    assert "setup" in result.output
+    assert "config" in result.output
+
+
+def test_parse_help_flag(cli_runner):
+    """Test that parse --help shows usage information."""
+    result = cli_runner.invoke(cli, ["parse", "--help"])
+    assert result.exit_code == 0
     assert "--file" in result.output
     assert "--changeid" in result.output
-    assert "--version" in result.output
     assert "--json" in result.output
     assert "--dry-run" in result.output
 
 
 def test_json_flag_output(cli_runner, sample_json_file):
     """Test that --json outputs valid JSON."""
-    result = cli_runner.invoke(main, ["--file", str(sample_json_file), "--json"])
+    result = cli_runner.invoke(cli, ["parse", "--file", str(sample_json_file), "--json"])
     assert result.exit_code == 0
 
     parsed = json.loads(result.output)
@@ -38,7 +46,7 @@ def test_json_flag_output(cli_runner, sample_json_file):
 
 def test_json_flag_comment_structure(cli_runner, sample_json_file):
     """Test that --json output has correct comment structure."""
-    result = cli_runner.invoke(main, ["--file", str(sample_json_file), "--json"])
+    result = cli_runner.invoke(cli, ["parse", "--file", str(sample_json_file), "--json"])
     parsed = json.loads(result.output)
 
     assert len(parsed["comments"]) == 3
@@ -52,8 +60,8 @@ def test_json_flag_comment_structure(cli_runner, sample_json_file):
 def test_dry_run_shows_command(cli_runner, gerrit_env):
     """Test that --dry-run shows the SSH command that would be executed."""
     result = cli_runner.invoke(
-        main,
-        ["--changeid", "12345", "--dry-run"],
+        cli,
+        ["parse", "--changeid", "12345", "--dry-run"],
         env=gerrit_env,
     )
     assert result.exit_code == 0
@@ -67,8 +75,8 @@ def test_dry_run_shows_command(cli_runner, gerrit_env):
 def test_dry_run_with_query(cli_runner, gerrit_env):
     """Test that --dry-run works with --query option."""
     result = cli_runner.invoke(
-        main,
-        ["--query", "status:open", "--dry-run"],
+        cli,
+        ["parse", "--query", "status:open", "--dry-run"],
         env=gerrit_env,
     )
     assert result.exit_code == 0
@@ -79,8 +87,8 @@ def test_dry_run_with_query(cli_runner, gerrit_env):
 def test_dry_run_with_json(cli_runner, gerrit_env):
     """Test that --dry-run combined with --json outputs JSON format."""
     result = cli_runner.invoke(
-        main,
-        ["--changeid", "12345", "--dry-run", "--json"],
+        cli,
+        ["parse", "--changeid", "12345", "--dry-run", "--json"],
         env=gerrit_env,
     )
     assert result.exit_code == 0
@@ -90,3 +98,17 @@ def test_dry_run_with_json(cli_runner, gerrit_env):
     assert parsed["dry_run"] is True
     assert "command" in parsed
     assert "ssh" in parsed["command"]
+
+
+def test_setup_help(cli_runner):
+    """Test that setup --help shows usage information."""
+    result = cli_runner.invoke(cli, ["setup", "--help"])
+    assert result.exit_code == 0
+    assert "Configure Gerrit connection" in result.output
+
+
+def test_config_show_help(cli_runner):
+    """Test that config show --help shows usage information."""
+    result = cli_runner.invoke(cli, ["config", "show", "--help"])
+    assert result.exit_code == 0
+    assert "Display current configuration" in result.output
