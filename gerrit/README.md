@@ -79,6 +79,13 @@ cat review.json | gerrit-review-parser parse
 | `setup` | Configure Gerrit connection interactively |
 | `config show` | Display current configuration settings |
 
+## Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--version` | Show version and exit |
+| `--help` | Show help message and exit |
+
 ## Parse Options
 
 | Option | Short | Description |
