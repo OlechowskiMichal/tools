@@ -7,13 +7,14 @@ name = "gerrit-review-parser"
 version = "0.2.0"
 description = "Parse Gerrit review JSON and display comments with file context"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [
     { name = "Michal Olechowski" }
 ]
 dependencies = [
     "click>=8.0.0",
+    "tomli-w>=1.0.0",
 ]
 
 [project.optional-dependencies]

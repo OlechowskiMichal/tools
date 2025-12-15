@@ -14,7 +14,17 @@ pip install -e .
 
 ## Configuration
 
-Create `~/.env.gerrit`:
+### Interactive Setup (Recommended)
+
+```bash
+gerrit-review-parser setup
+```
+
+This will prompt for your Gerrit server details and save them to `~/.config/gerrit-review-parser/config.toml`.
+
+### Environment Variables
+
+You can also set environment variables (these take precedence over the config file):
 
 ```bash
 export GERRIT_HOST="gerrit.example.com"
@@ -22,7 +32,23 @@ export GERRIT_PORT="29418"
 export GERRIT_USER="your-username"
 ```
 
-Or set environment variables directly.
+### View Current Configuration
+
+```bash
+gerrit-review-parser config show
+```
+
+This displays the effective configuration and indicates the source of each value (env, file, or default).
+
+### Upgrading from Previous Versions
+
+If you previously used `.env.gerrit`, the configuration has moved to `~/.config/gerrit-review-parser/config.toml`. Run the interactive setup to migrate:
+
+```bash
+gerrit-review-parser setup
+```
+
+Your old `.env.gerrit` will no longer be read; environment variables (`GERRIT_HOST`, `GERRIT_PORT`, `GERRIT_USER`) continue to take precedence if set.
 
 ## Usage
 
@@ -31,35 +57,49 @@ Or set environment variables directly.
 gerrit-review-parser --version
 
 # Fetch and parse a change by ID
-gerrit-review-parser --changeid 12345
+gerrit-review-parser parse --changeid 12345
 
 # Parse a local JSON file
-gerrit-review-parser --file review.json
+gerrit-review-parser parse --file review.json
 
 # Show only unresolved comments
-gerrit-review-parser --changeid 12345 --unresolved-only
+gerrit-review-parser parse --changeid 12345 --unresolved-only
 
 # Fetch and save JSON for later
-gerrit-review-parser --changeid 12345 --save
+gerrit-review-parser parse --changeid 12345 --save
 
 # Custom query
-gerrit-review-parser --query "status:open project:myproject"
+gerrit-review-parser parse --query "status:open project:myproject"
 
 # Output as JSON (for CI/CD pipelines)
-gerrit-review-parser --file review.json --json
+gerrit-review-parser parse --file review.json --json
 
 # Preview SSH command without executing
-gerrit-review-parser --changeid 12345 --dry-run
+gerrit-review-parser parse --changeid 12345 --dry-run
 
 # Read from stdin
-cat review.json | gerrit-review-parser
+cat review.json | gerrit-review-parser parse
 ```
 
-## Options
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `parse` | Parse Gerrit review JSON and display comments |
+| `setup` | Configure Gerrit connection interactively |
+| `config show` | Display current configuration settings |
+
+## Global Options
+
+| Option | Description |
+|--------|-------------|
+| `--version` | Show version and exit |
+| `--help` | Show help message and exit |
+
+## Parse Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--version` | | Show version and exit |
 | `--file` | `-f` | Path to Gerrit review JSON file |
 | `--changeid` | `-c` | Gerrit change ID to fetch |
 | `--query` | `-q` | Gerrit query string |

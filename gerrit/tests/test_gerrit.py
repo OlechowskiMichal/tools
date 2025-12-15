@@ -1,11 +1,11 @@
 """Unit tests for gerrit module - config loading without os.environ mutation."""
 
 import os
-from pathlib import Path
-from tempfile import NamedTemporaryFile
+
+import tomli_w
 
 from gerrit_review_parser.commands import build_query_command
-from gerrit_review_parser.config import load_gerrit_config
+from gerrit_review_parser.config import load_gerrit_config, _load_config_file
 from gerrit_review_parser.models import GerritConfig
 
 
@@ -36,27 +36,6 @@ def test_load_gerrit_config_default_port():
     config = load_gerrit_config(env=env)
 
     assert config.port == "29418"
-
-
-def test_load_gerrit_config_from_file():
-    """Test loading config from env file without mutating os.environ."""
-    original_environ = dict(os.environ)
-
-    with NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write('export GERRIT_HOST="file.gerrit.com"\n')
-        f.write('export GERRIT_USER="fileuser"\n')
-        f.write('export GERRIT_PORT="54321"\n')
-        env_file = Path(f.name)
-
-    try:
-        config = load_gerrit_config(env={}, env_file=env_file)
-
-        assert config.host == "file.gerrit.com"
-        assert config.user == "fileuser"
-        assert config.port == "54321"
-        assert os.environ == original_environ
-    finally:
-        env_file.unlink()
 
 
 def test_config_no_environ_mutation():
@@ -97,37 +76,99 @@ def test_build_query_command_includes_flags():
     assert "--comments" in cmd
 
 
-# --- Edge case tests (bug catchers) ---
+def test_load_config_file_toml(monkeypatch, tmp_path):
+    """Test loading config from TOML file."""
+    config_dir = tmp_path / ".config" / "gerrit-review-parser"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.toml"
+
+    data = {
+        "host": "toml.gerrit.com",
+        "port": "54321",
+        "user": "tomluser",
+    }
+    with open(config_file, "wb") as f:
+        tomli_w.dump(data, f)
+
+    import gerrit_review_parser.config as config_module
+    monkeypatch.setattr(config_module, "CONFIG_FILE", config_file)
+
+    result = _load_config_file()
+
+    assert result is not None
+    assert result.host == "toml.gerrit.com"
+    assert result.port == "54321"
+    assert result.user == "tomluser"
 
 
-def test_config_file_malformed_line_skipped():
-    """Malformed lines (no =) in env file should be skipped."""
-    with NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write('export GERRIT_HOST="test.gerrit.com"\n')
-        f.write('this line has no equals sign\n')
-        f.write('export GERRIT_USER="testuser"\n')
-        env_file = Path(f.name)
+def test_load_config_file_missing_returns_none(monkeypatch, tmp_path):
+    """Test that missing config file returns None."""
+    config_file = tmp_path / "nonexistent" / "config.toml"
 
-    try:
-        config = load_gerrit_config(env={}, env_file=env_file)
-        assert config.host == "test.gerrit.com"
-        assert config.user == "testuser"
-    finally:
-        env_file.unlink()
+    import gerrit_review_parser.config as config_module
+    monkeypatch.setattr(config_module, "CONFIG_FILE", config_file)
+
+    result = _load_config_file()
+    assert result is None
 
 
-def test_config_file_non_export_lines_skipped():
-    """Lines not starting with 'export ' should be skipped."""
-    with NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write('# This is a comment\n')
-        f.write('export GERRIT_HOST="test.gerrit.com"\n')
-        f.write('GERRIT_PORT=12345\n')  # missing 'export '
-        f.write('export GERRIT_USER="testuser"\n')
-        env_file = Path(f.name)
+def test_load_config_file_invalid_toml_returns_none(monkeypatch, tmp_path):
+    """Test that invalid TOML file returns None."""
+    config_dir = tmp_path / ".config" / "gerrit-review-parser"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.toml"
 
-    try:
-        config = load_gerrit_config(env={}, env_file=env_file)
-        assert config.host == "test.gerrit.com"
-        assert config.port == "29418"  # falls back to default
-    finally:
-        env_file.unlink()
+    with open(config_file, "w") as f:
+        f.write("this is not valid toml [[[")
+
+    import gerrit_review_parser.config as config_module
+    monkeypatch.setattr(config_module, "CONFIG_FILE", config_file)
+
+    result = _load_config_file()
+    assert result is None
+
+
+def test_load_config_file_missing_keys_returns_none(monkeypatch, tmp_path):
+    """Test that TOML file with missing required keys returns None."""
+    config_dir = tmp_path / ".config" / "gerrit-review-parser"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.toml"
+
+    data = {"host": "gerrit.com"}  # missing port and user
+    with open(config_file, "wb") as f:
+        tomli_w.dump(data, f)
+
+    import gerrit_review_parser.config as config_module
+    monkeypatch.setattr(config_module, "CONFIG_FILE", config_file)
+
+    result = _load_config_file()
+    assert result is None
+
+
+def test_env_takes_precedence_over_file(monkeypatch, tmp_path):
+    """Test that environment variables take precedence over config file."""
+    config_dir = tmp_path / ".config" / "gerrit-review-parser"
+    config_dir.mkdir(parents=True)
+    config_file = config_dir / "config.toml"
+
+    data = {
+        "host": "file.gerrit.com",
+        "port": "11111",
+        "user": "fileuser",
+    }
+    with open(config_file, "wb") as f:
+        tomli_w.dump(data, f)
+
+    import gerrit_review_parser.config as config_module
+    monkeypatch.setattr(config_module, "CONFIG_FILE", config_file)
+
+    env = {
+        "GERRIT_HOST": "env.gerrit.com",
+        "GERRIT_USER": "envuser",
+    }
+
+    config = load_gerrit_config(env=env)
+
+    assert config.host == "env.gerrit.com"
+    assert config.user == "envuser"
+    assert config.port == "29418"  # DEFAULT_PORT, not file port

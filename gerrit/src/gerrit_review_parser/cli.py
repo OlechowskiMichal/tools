@@ -9,19 +9,30 @@ import click
 
 from . import __version__
 from .commands import build_query_command
-from .config import load_gerrit_config
+from .config import (
+    ConfigError,
+    get_config_path,
+    get_config_with_sources,
+    load_gerrit_config,
+    save_config,
+)
 from .display import display_review
 from .errors import fatal_exit
 from .gerrit import fetch_from_gerrit
 from .io import read_file, write_file
-from .models import Comment, ReviewOutput
+from .models import Comment, GerritConfig, ReviewOutput
 from .parser import extract_comments, parse_json_content
 
 logger = logging.getLogger(__name__)
 
 
-@click.command()
+@click.group()
 @click.version_option(version=__version__, prog_name="gerrit-review-parser")
+def cli():
+    """Parse Gerrit review JSON and display comments with file context."""
+
+
+@cli.command()
 @click.option(
     "--file", "-f", "review_file",
     type=click.Path(exists=True),
@@ -35,16 +46,16 @@ logger = logging.getLogger(__name__)
 @click.option("--unresolved-only", "-u", is_flag=True, help="Show only unresolved comments")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON for machine processing")
 @click.option("--dry-run", is_flag=True, help="Show SSH command without executing")
-def main(
+def parse(
     review_file, changeid, query, save, output, debug_mode, unresolved_only, json_output, dry_run
 ):
     """Parse Gerrit review JSON and display comments with file context.
 
     Examples:
-        gerrit-review-parser --changeid 12345
-        gerrit-review-parser --file review.json --unresolved-only
-        gerrit-review-parser --query "status:open project:myproject" --save
-        gerrit-review-parser --changeid 12345 --dry-run
+        gerrit-review-parser parse --changeid 12345
+        gerrit-review-parser parse --file review.json --unresolved-only
+        gerrit-review-parser parse --query "status:open project:myproject" --save
+        gerrit-review-parser parse --changeid 12345 --dry-run
     """
     _setup_logging(debug_mode)
 
@@ -63,6 +74,86 @@ def main(
     data = parse_json_content(json_content)
     comments = extract_comments(data, unresolved_only)
     _output_result(data, comments, json_output, unresolved_only)
+
+
+@cli.command()
+def setup():
+    """Configure Gerrit connection settings interactively.
+
+    This command will prompt for your Gerrit server details and save them
+    to a configuration file for future use.
+    """
+    click.echo("Gerrit Review Parser - Configuration Setup")
+    click.echo("=" * 50)
+    click.echo()
+
+    host = click.prompt("Gerrit host (e.g., gerrit.example.com)", type=str)
+    if not host.strip():
+        click.echo("Error: Host cannot be empty", err=True)
+        sys.exit(1)
+
+    port = click.prompt("Gerrit SSH port", type=str, default="29418")
+    if not port.strip():
+        click.echo("Error: Port cannot be empty", err=True)
+        sys.exit(1)
+
+    try:
+        port_num = int(port)
+        if port_num < 1 or port_num > 65535:
+            click.echo("Error: Port must be between 1 and 65535", err=True)
+            sys.exit(1)
+    except ValueError:
+        click.echo("Error: Port must be a valid number", err=True)
+        sys.exit(1)
+
+    user = click.prompt("Gerrit username", type=str)
+    if not user.strip():
+        click.echo("Error: Username cannot be empty", err=True)
+        sys.exit(1)
+
+    config = GerritConfig(host=host.strip(), port=port.strip(), user=user.strip())
+
+    try:
+        save_config(config)
+        config_path = get_config_path()
+        click.echo()
+        click.echo("Configuration saved successfully!")
+        click.echo(f"Config file: {config_path}")
+    except OSError as e:
+        click.echo(f"Error saving configuration: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.group()
+def config():
+    """Manage configuration settings."""
+
+
+@config.command(name="show")
+def config_show():
+    """Display current configuration settings.
+
+    Shows the effective configuration values and indicates whether each
+    value comes from environment variables or the config file.
+    """
+    try:
+        cfg, sources = get_config_with_sources()
+
+        click.echo("Current Gerrit Configuration")
+        click.echo("=" * 50)
+        click.echo()
+        click.echo(f"Host:     {cfg.host} (from {sources['host']})")
+        click.echo(f"Port:     {cfg.port} (from {sources['port']})")
+        click.echo(f"User:     {cfg.user} (from {sources['user']})")
+        click.echo()
+
+        if any(s == "file" for s in sources.values()):
+            config_path = get_config_path()
+            click.echo(f"Config file: {config_path}")
+
+    except ConfigError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 # --- Private helpers ---
@@ -162,6 +253,11 @@ def _output_result(
         click.echo(json.dumps(result, indent=2))
     else:
         display_review(data, comments, unresolved_only)
+
+
+def main():
+    """Entry point for the CLI."""
+    cli(prog_name="gerrit-review-parser")
 
 
 if __name__ == "__main__":
